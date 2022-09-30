@@ -1,4 +1,4 @@
 flask
 gunicorn
-python-binance
+binance-futures-connector
 arrow

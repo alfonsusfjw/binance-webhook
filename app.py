@@ -1,52 +1,76 @@
 import json, config
-from binance.client import Client
-from binance.enums import *
-import time
-import arrow
+from datetime import datetime
+from binance.um_futures import UMFutures
 from flask import Flask, request
+
+
+# Requirement code for flask
 app = Flask(__name__)
 
 # API_KEY & API_SECRET
-client = Client(config.ori_key, config.ori_secret)
+eKey=config.testnet.key
+eSecret=config.testnet.key
+eBaseURL=config.testnet.url
+um_futures_client = UMFutures(key=eKey, secret=eSecret, base_url=eBaseURL)
 
-# Store the price
-openStore = []
-closeStore = []
-highStore = []
-lowStore = []
+# Database
+eSymbol = str("").upper() # BTCUSDT, BNBUSDT, ETHUSDT
+eSide = str("").upper() # BUY, SELL
+eType = str("MARKET").upper() # LIMIT, MARKET, STOP, STOP_MARKET, TAKE_PROFIT
+ePositionSide = str("BOTH").upper() # BOTH, LONG, SHORT
+eTimeInForce = str("GTC").upper()
+eQuantity = float()
+eReduceOnly = str("").upper()
+ePrice = float()
+eNewClientOrderId = "byTradingTool" # Optional string. An unique ID among open orders. Automatically generated if not sent.
+eStopPrice = float() # Optional float. Use with STOP/STOP_MARKET or TAKE_PROFIT/TAKE_PROFIT_MARKET orders
+eClosePosition = str("").upper() # Optional string. true or false; Close-All, use with STOP_MARKET or TAKE_PROFIT_MARKET.
+eActivationPrice = float() # Optional float. Use with TRAILING_STOP_MARKET orders, default is the latest price
+eCallbackRate = float() # Optional float. Use with TRAILING_STOP_MARKET orders, min 0.1, max 5 where 1 for 1%.
+eWorkingType = str("CONTRACT_PRICE").upper()
+ePriceProtect = str("FALSE").upper()
+eNewOrderRespType = str("ACK").upper()
+eRecvWindow = int(5000)
+webhookData = str()
 
-def tambah():
-    hasil = 1 + 12
-    return hasil
-
+# Homepage
 @app.route('/')
 def welcomePage():
     return 'Welcome to trading tools management system!'
 
+# Execute webhook signal
 @app.route("/webhook", methods=["POST"])
 def webhook():
-    #print(request.data)
-    data = json.loads(request.data)
 
-    print(data)
-    if data["validasi"]=="sukses":
-        print(f"berhasil, 1 + 12 = {tambah()}")
-    
-    aktif = True
-    while aktif:
-        candles = client.get_klines(symbol='BNBUSDT', interval=Client.KLINE_INTERVAL_1MINUTE, limit = 1,)
-        utc = candles[0][0]
-        waktu = arrow.get(utc).format("YYYY-MM-DD HH:mm:ss")
-        open = candles[0][1]
-        openStore.append(open)
-        high = candles[0][2]
-        highStore.append(highStore)
-        low = candles[0][3]
-        lowStore.append(low)
-        close = candles[0][4]
-        closeStore.append(close)
-        return f"{waktu}, Open: {open}, Close: {close}, High: {high}, Low: {low}"
-        time.sleep(1)
+    webhookData = json.loads(request.data)
+    eSymbol = webhookData["eSymbol"].upper()
+    eSide = webhookData["eSide"].upper()
+    eType = webhookData["eType"].upper()
+    ePositionSide = webhookData["ePositionSide"].upper()
+    eTimeInForce = webhookData["eTimeInForce"].upper()
+    eQuantity = webhookData["eQuantity"]
+    eNewClientOrderId = webhookData["eNewClientOrderId"]
+    print(eSymbol)
+    print(eSide)
+    print(eType)
+    print(ePositionSide)
+    print(eTimeInForce)
+    print(eQuantity)
+    print(eNewClientOrderId)
 
+    um_futures_client = UMFutures(key=config.testnet.key, secret=config.testnet.secret, base_url=config.testnet.url)
+    newOrder = um_futures_client.new_order(symbol=eSymbol, side=eSide, type=eType, positionSide=ePositionSide, quantity=eQuantity, newClientOrderId= eNewClientOrderId)
+    print()
+    print("=======================================================")
+    print()
+    print(f"Eksekusi pada {datetime.now()}")
+    print()
+    print(newOrder)
+
+    return webhookData 
+
+
+# Run flask
 if __name__ == "__main__":
     app.run(debug=True)
+
