@@ -1,5 +1,5 @@
 import json, config
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from binance.um_futures import UMFutures
 from flask import Flask, request
 
@@ -60,12 +60,20 @@ def webhook():
 
     um_futures_client = UMFutures(key=config.testnet.key, secret=config.testnet.secret, base_url=config.testnet.url)
     newOrder = um_futures_client.new_order(symbol=eSymbol, side=eSide, type=eType, positionSide=ePositionSide, quantity=eQuantity, newClientOrderId= eNewClientOrderId)
+
+    nowtime = datetime.now()
+    d = datetime.fromisoformat(str(nowtime))
+    tz = timezone(timedelta(hours=7))
+    new_time = d.astimezone(tz)
+
     print()
     print("=======================================================")
     print()
-    print(f"Eksekusi pada {datetime.now()}")
+    print(f"Eksekusi pada {new_time}")
     print()
     print(newOrder)
+    print()
+    print("=======================================================")
 
     return webhookData 
 
