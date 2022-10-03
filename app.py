@@ -48,12 +48,14 @@ def webhook():
     eType = webhookData["eType"].upper()
     ePositionSide = webhookData["ePositionSide"].upper()
     eTimeInForce = webhookData["eTimeInForce"].upper()
-    eQuantity = float(webhookData["eQuantity"].split()[0])
+    eQuantity = float(str(webhookData["eQuantity"].split()[0]))
     ePrice = float(webhookData["ePrice"])
     pembagi = float(ePrice / eQuantity)
     lot = float(1.0/pembagi)
     lot = str(lot)
     lot = lot[0:4]
+    tp = ePrice + (ePrice * 3/100)
+
     
     eNewClientOrderId = webhookData["eNewClientOrderId"]
     print(eSymbol)
@@ -65,9 +67,10 @@ def webhook():
     print(pembagi)
     print(f"Size = {lot}")
     print(eNewClientOrderId)
+    print(tp)
 
     um_futures_client = UMFutures(key=config.testnet.key, secret=config.testnet.secret, base_url=config.testnet.url)
-    newOrder = um_futures_client.new_order(symbol=eSymbol, side=eSide, type=eType, positionSide=ePositionSide, quantity=lot, newClientOrderId= eNewClientOrderId)
+    newOrder = um_futures_client.new_order(symbol=eSymbol, side=eSide, type=eType, positionSide=ePositionSide, quantity=lot, newClientOrderId=eNewClientOrderId)
 
     nowtime = datetime.now()
     d = datetime.fromisoformat(str(nowtime))
