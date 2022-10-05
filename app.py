@@ -35,17 +35,27 @@ def webhook():
         dTP = webhookData["whTP"] # dalam percent
         dSL = webhookData["whSL"] # dalam percent
         
-        print(dSymbol)
-        print(dPrice)
-        print(dSide)
-        print(dPositionSide)
-        print(dType)
-        print(dSize)
-        print(dQuantity)
-        print(dTimeInForce)
-        print(dUseSLTP)
-        print(dTP)
-        print(dSL)
+        # Place a time for debugging
+        nowtime = datetime.now()
+        d = datetime.fromisoformat(str(nowtime))
+        tz = timezone(timedelta(hours=7))
+        new_time = d.astimezone(tz)
+
+        print()
+        print("###################################################################################################")
+        print(new_time)
+        print("###################################################################################################")
+        print(f"dSymbol = {dSymbol}")
+        print(f"dPrice = {dPrice}")
+        print(f"dSide = {dSide}")
+        print(f"dPositionSide = {dPositionSide}")
+        print(f"dType = {dType}")
+        print(f"dSize = {dSize}")
+        print(f"dQuantity = {dQuantity}")
+        print(f"dTimeInForce = {dTimeInForce}")
+        print(f"dUseSLTP = {dUseSLTP}")
+        print(f"dTP = {dTP}")
+        print(f"dSL = {dSL}")
 
         # Take Profit Formula
         def TP(x,y): # x = dTP & y = dPrice
@@ -137,20 +147,10 @@ def webhook():
                 # reduceOnly="TRUE"
             )
 
-        nowtime = datetime.now()
-        d = datetime.fromisoformat(str(nowtime))
-        tz = timezone(timedelta(hours=7))
-        new_time = d.astimezone(tz)
-        print()
-        print(new_time)
-        print()
-        print("===========================================================")
-        print()
+        print("===================================================================================================")
         print(newOpenPosition)
-        print()
-        print("===========================================================")
-        print()
-
+        print("===================================================================================================")
+        
         return webhookData
 
 # Run flask
