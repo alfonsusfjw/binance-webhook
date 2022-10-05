@@ -1,6 +1,4 @@
 import json, config
-
-from numpy import dtype
 from sys import excepthook
 from datetime import datetime, timedelta, timezone
 from binance.um_futures import UMFutures
