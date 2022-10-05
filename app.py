@@ -1,37 +1,19 @@
 import json, config
+
+from numpy import dtype
+from sys import excepthook
 from datetime import datetime, timedelta, timezone
 from binance.um_futures import UMFutures
 from flask import Flask, request
-
 
 # Requirement code for flask
 app = Flask(__name__)
 
 # API_KEY & API_SECRET
 eKey=config.testnet.key
-eSecret=config.testnet.key
+eSecret=config.testnet.secret
 eBaseURL=config.testnet.url
 um_futures_client = UMFutures(key=eKey, secret=eSecret, base_url=eBaseURL)
-
-# Database
-# eSymbol = str("").upper() # BTCUSDT, BNBUSDT, ETHUSDT
-# eSide = str("").upper() # BUY, SELL
-# eType = str("MARKET").upper() # LIMIT, MARKET, STOP, STOP_MARKET, TAKE_PROFIT
-# ePositionSide = str("BOTH").upper() # BOTH, LONG, SHORT
-# eTimeInForce = str("GTC").upper()
-# eQuantity = float()
-# eReduceOnly = str("").upper()
-# ePrice = float()
-# eNewClientOrderId = "byTradingTool" # Optional string. An unique ID among open orders. Automatically generated if not sent.
-# eStopPrice = float() # Optional float. Use with STOP/STOP_MARKET or TAKE_PROFIT/TAKE_PROFIT_MARKET orders
-# eClosePosition = str("").upper() # Optional string. true or false; Close-All, use with STOP_MARKET or TAKE_PROFIT_MARKET.
-# eActivationPrice = float() # Optional float. Use with TRAILING_STOP_MARKET orders, default is the latest price
-# eCallbackRate = float() # Optional float. Use with TRAILING_STOP_MARKET orders, min 0.1, max 5 where 1 for 1%.
-# eWorkingType = str("CONTRACT_PRICE").upper()
-# ePriceProtect = str("FALSE").upper()
-# eNewOrderRespType = str("ACK").upper()
-# eRecvWindow = int(5000)
-# webhookData = str()
 
 # Homepage
 @app.route('/')
@@ -41,56 +23,137 @@ def welcomePage():
 # Execute webhook signal
 @app.route("/webhook", methods=["POST"])
 def webhook():
+    if request.method == "POST":
+        webhookData = json.loads(request.data)
+        dSymbol = webhookData["whSymbol"]
+        dPrice = webhookData["whPrice"]
+        dSide = webhookData["whSide"]
+        dPositionSide = "LONG" if dSide == "BUY" else "SHORT"
+        dType = webhookData["whType"] # MARKET/LIMIT/STOP
+        dSize = webhookData["whSize"]
+        dQuantity = str(1.0 / (float(dPrice) / float(dSize.split()[0])))[0:4]
+        dTimeInForce = webhookData["whTimeInForce"]
+        dUseSLTP = webhookData["whUseSLTP"] # True / False
+        dTP = webhookData["whTP"] # dalam percent
+        dSL = webhookData["whSL"] # dalam percent
+        
+        print(dSymbol)
+        print(dPrice)
+        print(dSide)
+        print(dPositionSide)
+        print(dType)
+        print(dSize)
+        print(dQuantity)
+        print(dTimeInForce)
+        print(dUseSLTP)
+        print(dTP)
+        print(dSL)
 
-    webhookData = json.loads(request.data)
-    eSymbol = webhookData["eSymbol"].upper()
-    eSide = webhookData["eSide"].upper()
-    eType = webhookData["eType"].upper()
-    ePositionSide = webhookData["ePositionSide"].upper()
-    eTimeInForce = webhookData["eTimeInForce"].upper()
-    eQuantity = float(str(webhookData["eQuantity"]).split()[0])
-    ePrice = float(webhookData["ePrice"])
-    pembagi = float(ePrice / eQuantity)
-    lot = float(1.0/pembagi)
-    lot = str(lot)
-    lot = lot[0:4]
-    tp = ePrice + (ePrice * 3/100)
+        # Take Profit Formula
+        def TP(x,y): # x = dTP & y = dPrice
+            if dSide == "BUY" :
+                return (100 + x)/100 * y
+            else:
+                return (100 - x)/100 * y
 
-    
-    eNewClientOrderId = webhookData["eNewClientOrderId"]
-    print()
-    print("=======================================================")
-    print()
-    print(f"Symbol = {eSymbol}")
-    print(f"Side = {eSide}")
-    print(f"Type = {eType}")
-    print(f"Position Side = {ePositionSide}")
-    print(f"Time in Force = {eTimeInForce}")
-    print(f"Quantity = {eQuantity}")
-    print(f"Pembagi = {pembagi}")
-    print(f"Size = {lot}")
-    print(f"Client ID = {eNewClientOrderId}")
-    print(f"Tp = {tp}")
+        # Stop Loss Formula
+        def SL(x,y): # x = dSL & y = dPrice
+            if dSide == "BUY" :
+                return (100 - x)/100 * y
+            else:
+                return (100 + x)/100 * y
 
-    um_futures_client = UMFutures(key=config.testnet.key, secret=config.testnet.secret, base_url=config.testnet.url)
-    newOrder = um_futures_client.new_order(symbol=eSymbol, side=eSide, type=eType, positionSide=ePositionSide, quantity=lot, newClientOrderId=eNewClientOrderId)
+        # Execute The Signal
+        if dType == "MARKET":
+            lastOrder = um_futures_client.get_position_risk(symbol="BNBUSDT",recvWindow=6000)
+            openedLongSize = float(lastOrder[0]["positionAmt"])
+            openedShortSize = float(lastOrder[1]["positionAmt"])
+            if openedLongSize != 0.00:
+                # Close Opened Buy
+                newOpenPosition = um_futures_client.new_order(
+                    symbol=dSymbol,
+                    side="SELL",
+                    positionSide="LONG",
+                    type=dType,
+                    quantity=abs(openedLongSize),
+                )
+            if openedShortSize != 0.00:
+                # Close Opened Sell
+                newOpenPosition = um_futures_client.new_order(
+                    symbol=dSymbol,
+                    side="BUY",
+                    positionSide="SHORT",
+                    type=dType,
+                    quantity=abs(openedShortSize),
+                )
+            # Open New Market
+            newOpenPosition = um_futures_client.new_order(
+                symbol=dSymbol,
+                side=dSide,
+                positionSide=dPositionSide,
+                type=dType,
+                quantity=dQuantity,
+            )
+        elif dType == "LIMIT":
+            newOpenPosition = um_futures_client.new_order(
+                symbol=dSymbol,
+                side=dSide,
+                positionSide=dPositionSide,
+                type=dType,
+                quantity=dQuantity,
+                timeInForce=dTimeInForce,
+                price=dPrice,
+            )
+        elif dType == "STOP":
+            newOpenPosition = um_futures_client.new_order(
+                symbol=dSymbol,
+                side=dSide,
+                positionSide=dPositionSide,
+                type=dType,
+                quantity=dQuantity,
+                timeInForce=dTimeInForce,
+                price=dPrice,
+                stopPrice=dPrice
+            )
+        
+        # Use Take Profit & Stoplos
+        if dUseSLTP == True:
+            setTakeProfit = um_futures_client.new_order(
+                    symbol=dSymbol,
+                    side= "SELL" if dSide == "BUY" else "BUY",
+                    positionSide=dPositionSide,
+                    type="TAKE_PROFIT_MARKET",
+                    quantity=dQuantity,
+                    timeInForce=dTimeInForce,
+                    stopPrice=TP(dTP,dPrice)
+                    # reduceOnly="TRUE"
+                )
+            setStopLoss = um_futures_client.new_order(
+                symbol=dSymbol,
+                side= "SELL" if dSide == "BUY" else "BUY",
+                positionSide=dPositionSide,
+                type="STOP_MARKET",
+                quantity=dQuantity,
+                timeInForce=dTimeInForce,
+                stopPrice=SL(dSL,dPrice)
+                # reduceOnly="TRUE"
+            )
 
-    nowtime = datetime.now()
-    d = datetime.fromisoformat(str(nowtime))
-    tz = timezone(timedelta(hours=7))
-    new_time = d.astimezone(tz)
+        nowtime = datetime.now()
+        d = datetime.fromisoformat(str(nowtime))
+        tz = timezone(timedelta(hours=7))
+        new_time = d.astimezone(tz)
+        print()
+        print(new_time)
+        print()
+        print("===========================================================")
+        print()
+        print(newOpenPosition)
+        print()
+        print("===========================================================")
+        print()
 
-    print()
-    print("=======================================================")
-    print()
-    print(f"Eksekusi pada {new_time}")
-    print()
-    print(newOrder)
-    print()
-    print("=======================================================")
-
-    return webhookData 
-
+        return webhookData
 
 # Run flask
 if __name__ == "__main__":
