@@ -84,7 +84,7 @@ def webhook():
             openedLongPnL = float(lastOrder[0]["unRealizedProfit"])
             openedShortPnL = float(lastOrder[1]["unRealizedProfit"])
             
-            if dCloseBySignal = "TRUE":
+            if dCloseBySignal == "TRUE":
                 if openedLongSize != 0.00 and openedLongPnL > 0:
                     # Close Opened Buy
                     newOpenPosition = um_futures_client.new_order(
