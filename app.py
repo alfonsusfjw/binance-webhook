@@ -23,18 +23,20 @@ def welcomePage():
 def webhook():
     if request.method == "POST":
         webhookData = json.loads(request.data)
+        lastPrice = um_futures_client.klines("BNBUSDT", "1m", limit = 1)[0][4]
         dSymbol = webhookData["whSymbol"]
-        dPrice = webhookData["whPrice"]
+        dPrice = float(lastPrice)
         dSide = webhookData["whSide"]
         dPositionSide = "LONG" if dSide == "BUY" else "SHORT"
         dType = webhookData["whType"] # MARKET/LIMIT/STOP
         dSize = webhookData["whSize"]
         dQuantity = round(1.0 / (float(dPrice) / float(dSize.split(" USDT")[0])), 2)
         dTimeInForce = webhookData["whTimeInForce"]
+        dCloseBySignal = webhookData["whCloseBySignal"]
         dUseTP = webhookData["whUseTP"] # True / False
         dUseSL = webhookData["whUseSL"]
         dTP = webhookData["whTP"] # dalam percent
-        dSL = webhookData["whSL"] # dalam percent
+        dSL = webhookData["whSL"] # dalam percen
         
         # Place a time for debugging
         nowtime = datetime.now()
@@ -54,6 +56,7 @@ def webhook():
         print(f"dSize = {dSize}")
         print(f"dQuantity = {dQuantity}")
         print(f"dTimeInForce = {dTimeInForce}")
+        print(f"dCloseBySignal = {dCloseBySignal}")
         print(f"dUseTP = {dUseTP}")
         print(f"dUseSLT = {dUseSL}")
         print(f"dTP = {dTP}")
@@ -80,25 +83,27 @@ def webhook():
             openedShortSize = float(lastOrder[1]["positionAmt"])
             openedLongPnL = float(lastOrder[0]["unRealizedProfit"])
             openedShortPnL = float(lastOrder[1]["unRealizedProfit"])
+            
+            if dCloseBySignal = "TRUE":
+                if openedLongSize != 0.00 and openedLongPnL > 0:
+                    # Close Opened Buy
+                    newOpenPosition = um_futures_client.new_order(
+                        symbol=dSymbol,
+                        side="SELL",
+                        positionSide="LONG",
+                        type=dType,
+                        quantity=abs(openedLongSize),
+                    )
+                if openedShortSize != 0.00 and openedShortPnL >0:
+                    # Close Opened Sell
+                    newOpenPosition = um_futures_client.new_order(
+                        symbol=dSymbol,
+                        side="BUY",
+                        positionSide="SHORT",
+                        type=dType,
+                        quantity=abs(openedShortSize),
+                    )
 
-            if openedLongSize != 0.00 and openedLongPnL > 0:
-                # Close Opened Buy
-                newOpenPosition = um_futures_client.new_order(
-                    symbol=dSymbol,
-                    side="SELL",
-                    positionSide="LONG",
-                    type=dType,
-                    quantity=abs(openedLongSize),
-                )
-            if openedShortSize != 0.00 and openedShortPnL >0:
-                # Close Opened Sell
-                newOpenPosition = um_futures_client.new_order(
-                    symbol=dSymbol,
-                    side="BUY",
-                    positionSide="SHORT",
-                    type=dType,
-                    quantity=abs(openedShortSize),
-                )
             # Open New Market
             newOpenPosition = um_futures_client.new_order(
                 symbol=dSymbol,
@@ -132,15 +137,18 @@ def webhook():
         # Use Take Profit & Stoplos
         if dUseTP == "TRUE":
             setTakeProfit = um_futures_client.new_order(
-                    symbol=dSymbol,
-                    side= "SELL" if dSide == "BUY" else "BUY",
-                    positionSide=dPositionSide,
-                    type="TAKE_PROFIT_MARKET",
-                    quantity=dQuantity,
-                    timeInForce=dTimeInForce,
-                    stopPrice=TP(0.3,dPrice)
-                    # reduceOnly="TRUE"
-                )
+                symbol=dSymbol,
+                side= "SELL" if dSide == "BUY" else "BUY",
+                positionSide=dPositionSide,
+                type="TAKE_PROFIT_MARKET",
+                quantity=dQuantity,
+                timeInForce="GTE_GTC",
+                stopPrice=TP(dTP,dPrice),
+                workingType = "MARK_PRICE",
+                priceProtect = "TRUE"
+            )
+            print(f"Take Profit = {setTakeProfit}")
+
         if dUseSL == "TRUE":
             setStopLoss = um_futures_client.new_order(
                 symbol=dSymbol,
@@ -148,12 +156,16 @@ def webhook():
                 positionSide=dPositionSide,
                 type="STOP_MARKET",
                 quantity=dQuantity,
-                timeInForce=dTimeInForce,
-                stopPrice=SL(dSL,dPrice)
+                timeInForce="GTE_GTC",
+                stopPrice=SL(dSL,dPrice),
+                reduceOnly= "TRUE",
+                workingType = "MARK_PRICE",
+                priceProtect = "TRUE"
             )
+            print(f"Stop Loss = {setStopLoss}")
 
         print("===================================================================================================")
-        print(newOpenPosition)
+        print(f"New Order = {newOpenPosition}")
         print("===================================================================================================")
         
         return webhookData
