@@ -25,17 +25,18 @@ def webhook():
         webhookData = json.loads(request.data)
         lastPrice = um_futures_client.klines("BNBUSDT", "1m", limit = 1)[0][4]
         dSymbol = webhookData["whSymbol"]
-        dPrice = float(lastPrice)
+        dPrice = float(lastPrice) # Current Price at Binance
         dSide = webhookData["whSide"]
         dPositionSide = "LONG" if dSide == "BUY" else "SHORT"
         dType = webhookData["whType"] # MARKET/LIMIT/STOP
-        dSize = webhookData["whSize"]
-        dQuantity = round(1.0 / (float(dPrice) / float(dSize.split(" USDT")[0])), 2)
+        dSize = webhookData["whSize"] # Inputed size in USDT
+        dQuantity = round(1.0 / (float(dPrice) / float(dSize.split(" USDT")[0])), 2) # Calculated Size in BNB/BTC/etc
         dTimeInForce = webhookData["whTimeInForce"]
         dCloseBySignal = webhookData["whCloseBySignal"]
         dUseTP = webhookData["whUseTP"] # True / False
         dUseSL = webhookData["whUseSL"]
         dTP = webhookData["whTP"] # dalam percent
+        dPnL = round(dTP*dPrice*dQuantity, 2)        
         dSL = webhookData["whSL"] # dalam percen
         
         # Place a time for debugging
@@ -58,6 +59,7 @@ def webhook():
         print(f"dTimeInForce = {dTimeInForce}")
         print(f"dCloseBySignal = {dCloseBySignal}")
         print(f"dUseTP = {dUseTP}")
+        print(f"dUseTP = {dPnL}")
         print(f"dUseSLT = {dUseSL}")
         print(f"dTP = {dTP}")
         print(f"dSL = {dSL}")
@@ -85,7 +87,7 @@ def webhook():
             openedShortPnL = float(lastOrder[1]["unRealizedProfit"])
             
             if dCloseBySignal == "TRUE":
-                if openedLongSize != 0.00 and openedLongPnL > 0:
+                if openedLongSize != 0.00 and openedLongPnL > dPnL :
                     # Close Opened Buy
                     newOpenPosition = um_futures_client.new_order(
                         symbol=dSymbol,
@@ -93,8 +95,9 @@ def webhook():
                         positionSide="LONG",
                         type=dType,
                         quantity=abs(openedLongSize),
+                        newClientOrderId = f"BUY{dSymbol}"
                     )
-                if openedShortSize != 0.00 and openedShortPnL >0:
+                if openedShortSize != 0.00 and openedShortPnL > dPnL:
                     # Close Opened Sell
                     newOpenPosition = um_futures_client.new_order(
                         symbol=dSymbol,
@@ -102,16 +105,28 @@ def webhook():
                         positionSide="SHORT",
                         type=dType,
                         quantity=abs(openedShortSize),
+                        newClientOrderId = f"SELL{dSymbol}"
                     )
 
             # Open New Market
-            newOpenPosition = um_futures_client.new_order(
-                symbol=dSymbol,
-                side=dSide,
-                positionSide=dPositionSide,
-                type=dType,
-                quantity=dQuantity,
-            )
+            if dSide == "BUY":
+                newOpenPosition = um_futures_client.new_order(
+                    symbol=dSymbol,
+                    side=dSide,
+                    positionSide=dPositionSide,
+                    type=dType,
+                    quantity=dQuantity,
+                    newClientOrderId = f"BUY{dSymbol}"
+                )
+            else:
+                newOpenPosition = um_futures_client.new_order(
+                    symbol=dSymbol,
+                    side=dSide,
+                    positionSide=dPositionSide,
+                    type=dType,
+                    quantity=dQuantity,
+                    newClientOrderId = f"SELL{dSymbol}"
+                )
         elif dType == "LIMIT":
             newOpenPosition = um_futures_client.new_order(
                 symbol=dSymbol,
