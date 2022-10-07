@@ -87,7 +87,7 @@ def webhook():
             openedShortPnL = float(lastOrder[1]["unRealizedProfit"])
             
             if dCloseBySignal == "TRUE":
-                if openedLongSize != 0.00 and openedLongPnL > dPnL :
+                if openedLongSize != 0.00 and openedLongPnL >= dPnL :
                     # Close Opened Buy
                     newOpenPosition = um_futures_client.new_order(
                         symbol=dSymbol,
@@ -97,7 +97,13 @@ def webhook():
                         quantity=abs(openedLongSize),
                         newClientOrderId = f"BUY{dSymbol}"
                     )
-                if openedShortSize != 0.00 and openedShortPnL > dPnL:
+                    cancelOpenedTP = um_futures_client.cancel_order(
+                        symbol=dSymbol,
+                        newClientOrderId = f"BUY{dSymbol}",
+                        recvWindow=2000
+                    )
+                    print(f"cancelOpenedTP = {cancelOpenedTP}")
+                if openedShortSize != 0.00 and openedShortPnL >= dPnL:
                     # Close Opened Sell
                     newOpenPosition = um_futures_client.new_order(
                         symbol=dSymbol,
@@ -107,6 +113,13 @@ def webhook():
                         quantity=abs(openedShortSize),
                         newClientOrderId = f"SELL{dSymbol}"
                     )
+                    cancelOpenedSL = um_futures_client.cancel_order(
+                        symbol=dSymbol,
+                        newClientOrderId = f"SELL{dSymbol}",
+                        recvWindow=2000
+                    )
+                    print(f"cancelOpenedSL = {cancelOpenedSL}")
+
 
             # Open New Market
             if dSide == "BUY":
